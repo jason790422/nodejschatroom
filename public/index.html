@@ -1,0 +1,254 @@
+<!doctype html>
+<html>
+<head>
+	<title>Yo Yo Yo</title>
+	<meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
+	<link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.5.0/css/font-awesome.min.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ionicons/2.0.1/css/ionicons.min.css">
+	<link rel="stylesheet" href="../dist/css/AdminLTE.min.css">
+	<link rel="stylesheet" href="../dist/css/skins/_all-skins.min.css">
+	<script src="../plugins/jQuery/jquery-2.2.3.min.js"></script>
+	<script src="../bootstrap/js/bootstrap.min.js"></script>
+	<script src="../plugins/slimScroll/jquery.slimscroll.min.js"></script>
+	<script src="../plugins/fastclick/fastclick.js"></script>
+	<script src="../dist/js/app.min.js"></script>
+	<script src="../dist/js/demo.js"></script>
+	<script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+	<script>
+		var socket = io();
+		var pic_url = ["dist/img/user1-128x128.jpg", "dist/img/user2-160x160.jpg", "dist/img/user3-128x128.jpg", "dist/img/user4-128x128.jpg", "dist/img/user5-128x128.jpg", "dist/img/user6-128x128.jpg", "dist/img/user7-128x128.jpg", "dist/img/user8-128x128.jpg"];
+		var monthEn = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+		$(document).ready(function() {
+			var name = "";
+			$(".lgname").modal({
+				keyboard: false,
+				backdrop: "static"
+			}).on("shown.bs.modal", function() {
+				$("#user_name").focus();
+			}).modal("show");
+			$("#name_click").on("click", function() {
+				name = $("#user_name").val();
+				if ( name == "" || name == null || name == "guest" ) {
+					name = "guest" + Math.floor((Math.random() * 1000) + 1);
+				}
+				var uesrData = {};
+				var pic_num = Math.floor((Math.random() * 6));
+				uesrData.name = name;
+				uesrData.pic  = pic_url[pic_num];
+				uesrData.uuid = guid();
+				var json = JSON.stringify(uesrData);
+				socket.emit("add user", json);
+				console.log("初始用戶："+json);
+				console.log(uesrData.uuid);
+				setCookie("client_cookie", uesrData.uuid, 1);
+				$(".fade").modal("hide");
+			});
+
+			//監聽新訊息事件
+			socket.on("chat message", function(data) {
+				obj = JSON.parse(data.chat);
+				if ( obj.uuid == getCookie("client_cookie") ) {
+					appendMessage(obj.name, obj.msg, obj.pic, "right");
+				}
+				else {
+					appendMessage(obj.name, obj.msg, obj.pic);
+				}
+			});
+			socket.on("add user", function(data) {
+				obj = JSON.parse(data.userData);
+				addUsers(obj.name + "已加入");
+			});
+
+			socket.on("all users", function(data) {
+				var num = data.alluser.length;
+				console.log("總用戶數:"+num);
+				var sb = "";
+				for(var d = 0; d < num; d++ ) {
+					console.log(data.alluser[d]);
+					var obj = JSON.parse(data.alluser[d]);
+					sb += '<li><img src="'+obj.pic+'" alt="User Image"><a class="users-list-name" href="#">'+obj.name+'</a></li>';
+				}
+				$("#message_use li").remove();
+				$("#message_use").append(sb);
+			});
+
+			socket.on("user left", function(data) {
+				obj = JSON.parse(data.userleft);
+				addUsers(obj.name + "已離開");
+			});
+
+			$("#send").click(function() {
+				var text = $("#m").val();
+				if ( text != "" || text != " " ) {
+					socket.emit("chat message", text);
+					$("textarea").val("");
+					// return false;
+				}
+			});
+			$("#m").keyup(function(event) {
+				if (event.keyCode == 13) {
+					var content = this.value;
+					var caret = getCaret(this);
+					if(event.shiftKey) {
+						this.value = content;
+						// this.value = content.substring( -1);
+						event.stopPropagation();
+					}
+					else {
+						// this.value = content.substring(0, caret - 1) + content.substring(caret, content.length);
+						// this.value = content.substring( -1);
+						$("#send").click();
+					}
+				}
+				// if ( event.which == 13 ) {
+				// 	$("#send").click();
+				// }
+			});
+			//icon
+			$("#smile").on("click", function() {
+				$(".smile").modal("show");
+			});
+			$(".icon").on("click", function() {
+				console.log($(this).attr("data-value"));
+				var icon = $(this).attr("data-value");
+				socket.emit("chat message", icon);
+				$(".smile").modal("hide");
+			});
+
+			function addUsers(msg) {
+				$("#messages").append('<div class="alert alert-info alert-dismissible"><button type="button" class="close" data-dismiss="alert" aria-hidden="true">×</button><h4><i class="icon fa fa-info"></i></h4>'+msg+'</div>');
+			}
+
+			function appendMessage(name, msg, pic, classright) {
+				var d   = new Date();
+				var m   = monthEn[d.getMonth()];
+				var day = d.getDate();
+				var h   = d.getHours();
+				var min = d.getMinutes();
+				$("#messages").append('<div class="direct-chat-msg '+classright+'"><div class="direct-chat-info clearfix"><span class="direct-chat-name pull-left">'+name+'</span><span class="direct-chat-timestamp pull-right">'+day+' '+m+' '+h+':'+min+'</span></div><img class="direct-chat-img" src="'+pic+'" alt="Message User Image"><div class="direct-chat-text">'+msg+'</div>');
+				document.body.scrollTop = document.body.scrollHeight;
+			}
+
+			function appendUsers(pic, name) {
+				$("#message_use").append('<li><img src="'+pic+'" alt="User Image"><a class="users-list-name" href="#">'+name+'</a></li>');
+			}
+
+			function setCookie(cname, cvalue, exdays) {
+				var d = new Date();
+				d.setTime( d.getTime() + ( exdays * 24 * 60 * 60 * 1000 ) );
+				var expires = "expires=" + d.toUTCString();
+				document.cookie = cname + "=" + cvalue + "; " + expires;
+			}
+
+			function getCookie(cname) {
+				var name = cname + "=";
+				var ca = document.cookie.split(';');
+				for(var i = 0; i < ca.length; i++) {
+					var c = ca[i];
+					while ( c.charAt(0) == ' ' ) {
+						c = c.substring(1);
+					}
+					if (c.indexOf(name) == 0) {
+						return c.substring(name.length, c.length);
+					}
+				}
+				return "";
+			}
+
+			function guid() {
+				return s4() + s4() + s4();
+			}
+
+			function s4() {
+				return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
+			}
+			//抓鍵盤
+			function getCaret(el) {
+				if (el.selectionStart) {
+					return el.selectionStart;
+				}
+				else if (document.selection) {
+					el.focus();
+					var r = document.selection.createRange();
+					if (r == null) {
+						return 0;
+					}
+					var re = el.createTextRange(), rc = re.duplicate();
+					re.moveToBookmark(r.getBookmark());
+					rc.setEndPoint('EndToStart', re);
+					return rc.text.length - 1;
+				}
+				return 0;
+			}
+		});
+	</script>
+	<style>
+		.direct-chat-messages {
+			/*min-height: 250px;*/
+			height: 100%;
+		}
+	</style>
+</head>
+<body>
+	<div class="col-md-12 col-sm-12 col-xs-12">
+		<div class="box box-warning box-solid">
+			<div class="box-header with-border">
+				<h3 class="box-title">All Users</h3>
+				<div class="box-tools pull-right">
+					<button type="button" class="btn btn-box-tool" data-widget="collapse"><i class="fa fa-minus"></i>
+					</button>
+				</div>
+			</div>
+			<div class="box-body no-padding">
+				<ul class="users-list clearfix" id="message_use">
+				</ul>
+			</div>
+		</div>
+	</div>
+	<div class="box-body">
+		<div class="direct-chat-messages" id="messages">
+		</div>
+	</div>
+	<div class="box-footer">
+		<a class="btn btn-social-icon" id="smile"><i class="fa fa-smile-o"></i></a>
+		<a class="btn btn-social-icon" id="file"><i class="fa fa-file-o"></i></a>
+		<div class="input-group">
+			<textarea name="message" id="m" placeholder="Type Message ..." class="form-control" rows="1"></textarea>
+			<span class="input-group-btn">
+				<button type="button" class="btn btn-primary btn-flat" id="send">Send</button>
+			</span>
+		</div>
+	</div>
+	<div class="modal fade lgname" tabindex="-1" role="dialog">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h4 class="modal-title">輸入名稱</h4>
+				</div>
+				<div class="modal-body">
+					<input type="text" name="user_name" id="user_name" placeholder="Your name..." class="form-control">
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-primary" id="name_click">登入</button>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="modal fade smile" role="dialog">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h4 class="modal-title">選擇貼圖</h4>
+				</div>
+				<div class="modal-body">
+					<a href="#" class="icon" data-value="::146.gif::"><img src="images/146.gif"></a>
+					<a href="#" class="icon" data-value="::147.gif::"><img src="images/147.gif"></a>
+					<a href="#" class="icon" data-value="::148.gif::"><img src="images/148.gif"></a>
+					<a href="#" class="icon" data-value="::149.png::"><img src="images/149.png"></a>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>
