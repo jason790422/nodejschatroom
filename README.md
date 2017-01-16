@@ -1,2 +1,3 @@
-# nodejschatroom
-#node.js 簡易聊天室
+# node.js 簡易聊天室
+簡易的聊天室
+套件的嘗試運用
